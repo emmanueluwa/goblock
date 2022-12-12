@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"time"
+
+	"github.com/emmanueluwa/goblock/network"
+)
 
 /***
 
@@ -17,5 +21,24 @@ SERVER(CONTAINER)
 ***/
 
 func main() {
-	fmt.Println("Obavan people")
+	transportLocal := network.NewLocalTransport("LOCAL")
+	transportRemote := network.NewLocalTransport(("REMOTE"))
+
+	transportLocal.Connect(transportRemote)
+	transportRemote.Connect(transportLocal)
+
+	go func() {
+		for {
+			transportRemote.SendMessage(transportLocal.Address(), []byte("Obavan people"))
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	//configure our own server/node
+	options := network.ServerOptions{
+		Transports: []network.Transport{transportLocal},
+	}
+
+	server := network.NewServer(options)
+	server.Start()
 }
