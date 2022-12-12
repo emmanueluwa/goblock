@@ -1,0 +1,21 @@
+package main
+
+import "fmt"
+
+/***
+
+DYNAMIC GENERIC BLOCKCHAIN
+- CAN BE CONFIGURED
+- IMPLEMENTATIONS CAN BE WRITTEN FOR TRANSPORT EG
+
+SERVER(CONTAINER)
+- MODULES, TRANSPORT LAYER -> TCP. UDP
+           BLOCK
+					 TRANSACTION
+					 KEYPAIRS
+
+***/
+
+func main() {
+	fmt.Println("Obavan people")
+}
