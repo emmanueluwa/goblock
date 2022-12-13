@@ -1,103 +1,51 @@
 package core
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
 	"io"
 
+	"github.com/emmanueluwa/goblock/crypto"
 	"github.com/emmanueluwa/goblock/types"
 )
 
 type Header struct {
-	Version       uint32
-	PreviousBlock types.Hash
-	TimeStamp     int64
+	Version           uint32
+	DataHash          types.Hash
+	PreviousBlockHash types.Hash
+	TimeStamp         int64
 	//eg 3 blocks, 1 genesis height=2
 	Height uint32
-	Nonce  uint64
-}
-
-// encode header to byte slice
-func (header *Header) EncodeBinary(writer io.Writer) error {
-	if err := binary.Write(writer, binary.LittleEndian, &header.Version); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, binary.LittleEndian, &header.PreviousBlock); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, binary.LittleEndian, &header.TimeStamp); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, binary.LittleEndian, &header.Height); err != nil {
-		return err
-	}
-	return binary.Write(writer, binary.LittleEndian, &header.Nonce)
-}
-
-// received block byte slice, decoded to header
-func (header *Header) DecodeBinary(reader io.Reader) error {
-	if err := binary.Read(reader, binary.LittleEndian, &header.Version); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, binary.LittleEndian, &header.PreviousBlock); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, binary.LittleEndian, &header.TimeStamp); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, binary.LittleEndian, &header.Height); err != nil {
-		return err
-	}
-	return binary.Read(reader, binary.LittleEndian, &header.Nonce)
 }
 
 type Block struct {
-	Header
+	*Header
 	Transactions []Transaction
+
+	//validator to enable a block to propose blocks into the network
+	Validator crypto.PublicKey
+	Signature *crypto.Signature
 
 	//chached version, costly to repeat it each time its needed
 	hash types.Hash
 }
 
-// block needs to be hashed
-func (block *Block) Hash() types.Hash {
-	buffer := &bytes.Buffer{}
-	block.Header.EncodeBinary(buffer)
+func NewBlock(header *Header, transaction []Transaction) *Block {
+	return &Block{
+		Header:       header,
+		Transactions: transaction,
+	}
+}
 
-	// checking empty hash
+func (block *Block) Decode(reader io.Reader, decoder Decoder[*Block]) error {
+	return decoder.Decode(reader, block)
+}
+
+func (block *Block) Encode(writer io.Writer, encoder Encoder[*Block]) error {
+	return encoder.Encode(writer, block)
+}
+
+func (block *Block) Hash(hasher Hasher[*Block]) types.Hash {
 	if block.hash.IsZero() {
-		//if hash is empty
-		block.hash = types.Hash(sha256.Sum256(buffer.Bytes()))
+		block.hash = hasher.Hash(block)
 	}
-
 	return block.hash
-}
-
-func (block *Block) EncodeBinary(writer io.Writer) error {
-	if err := block.Header.EncodeBinary(writer); err != nil {
-		return err
-	}
-
-	for _, tx := range block.Transactions {
-		if err := tx.EncodeBinary(writer); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (block *Block) DecodeBinary(reader io.Reader) error {
-	if err := block.Header.DecodeBinary(reader); err != nil {
-		return err
-	}
-
-	for _, tx := range block.Transactions {
-		if err := tx.DecodeBinary(reader); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
