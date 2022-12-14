@@ -1,9 +1,7 @@
 package core
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
 
 	"github.com/emmanueluwa/goblock/types"
 )
@@ -17,12 +15,6 @@ type BlockHasher struct {
 }
 
 func (BlockHasher) Hash(block *Block) types.Hash {
-	buffer := &bytes.Buffer{}
-	encode := gob.NewEncoder(buffer)
-	if err := encode.Encode(block.Header); err != nil {
-		panic(err)
-	}
-
-	header := sha256.Sum256(buffer.Bytes())
+	header := sha256.Sum256(block.HeaderData())
 	return types.Hash(header)
 }

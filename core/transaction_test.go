@@ -30,5 +30,6 @@ func TestVerifyTransaction(test *testing.T) {
 
 	randomPrivKey := crypto.GeneratePrivateKey()
 	transaction.PublicKey = randomPrivKey.PublicKey()
+
 	assert.NotNil(test, transaction.Verify())
 }
