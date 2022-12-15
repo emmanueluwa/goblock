@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -9,6 +10,8 @@ import (
 type Blockchain struct {
 	//for json rpc(recieving block) and protocol, other nodes can ask blocks to sync
 	store Storage
+	//for distirbuted env, blockchain data structure needs to be threadsafe
+	lock sync.RWMutex
 	//maintain in memory, RAM intensive instead of Disk intensive
 	headers   []*Header
 	validator Validator
@@ -43,6 +46,9 @@ func (blockchain *Blockchain) GetHeader(height uint32) (*Header, error) {
 		return nil, fmt.Errorf("given height (%d) too high", height)
 	}
 
+	blockchain.lock.Lock()
+	defer blockchain.lock.Unlock()
+
 	return blockchain.headers[height], nil
 }
 
@@ -52,13 +58,18 @@ func (blockchain *Blockchain) HasBlock(height uint32) bool {
 }
 
 func (blockchain *Blockchain) Height() uint32 {
+	blockchain.lock.RLock()
+	defer blockchain.lock.RUnlock()
+
 	//height of chain minus genesis block
 	return uint32(len(blockchain.headers)) - 1
 }
 
 // internal addblock
 func (blockchain *Blockchain) addBlockWithoutValidation(block *Block) error {
+	blockchain.lock.Lock()
 	blockchain.headers = append(blockchain.headers, block.Header)
+	blockchain.lock.Unlock()
 
 	logrus.WithFields(logrus.Fields{
 		"height": block.Height,
