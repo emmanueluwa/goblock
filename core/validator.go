@@ -27,6 +27,22 @@ func (validator *BlockValidator) ValidateBlock(block *Block) error {
 		return fmt.Errorf("chain already contains block (%d) with hash (%s)", block.Height, block.Hash(BlockHasher{}))
 	}
 
+	//ensuring block comes exactly after current height(no blocks skipped)
+	if block.Height != validator.blockchain.Height()+1 {
+		return fmt.Errorf("Block (%s) too hight", block.Hash(BlockHasher{}))
+	}
+
+	//checking hash of previous block
+	prevHeader, err := validator.blockchain.GetHeader(block.Height - 1)
+	if err != nil {
+		return err
+	}
+
+	hash := BlockHasher{}.Hash(prevHeader)
+	if hash != block.PreviousBlockHash {
+		return fmt.Errorf("The hash of the previous block (%s) is invalid", block.PreviousBlockHash)
+	}
+
 	if err := block.Verify(); err != nil {
 		return err
 	}

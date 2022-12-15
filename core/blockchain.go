@@ -1,6 +1,13 @@
 package core
 
+import (
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+)
+
 type Blockchain struct {
+	//for json rpc(recieving block) and protocol, other nodes can ask blocks to sync
 	store Storage
 	//maintain in memory, RAM intensive instead of Disk intensive
 	headers   []*Header
@@ -31,6 +38,14 @@ func (blockchain *Blockchain) AddBlock(block *Block) error {
 	return blockchain.addBlockWithoutValidation(block)
 }
 
+func (blockchain *Blockchain) GetHeader(height uint32) (*Header, error) {
+	if height > blockchain.Height() {
+		return nil, fmt.Errorf("given height (%d) too high", height)
+	}
+
+	return blockchain.headers[height], nil
+}
+
 // uninitalised uint32 --> 4294967295
 func (blockchain *Blockchain) HasBlock(height uint32) bool {
 	return height <= blockchain.Height()
@@ -44,6 +59,11 @@ func (blockchain *Blockchain) Height() uint32 {
 // internal addblock
 func (blockchain *Blockchain) addBlockWithoutValidation(block *Block) error {
 	blockchain.headers = append(blockchain.headers, block.Header)
+
+	logrus.WithFields(logrus.Fields{
+		"height": block.Height,
+		"hash":   block.Hash(BlockHasher{}),
+	}).Info("adding new block")
 
 	return blockchain.store.Put(block)
 }
