@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/emmanueluwa/goblock/crypto"
@@ -32,6 +33,16 @@ func TestVerifyTransaction(test *testing.T) {
 	transaction.From = randomPrivKey.PublicKey()
 
 	assert.NotNil(test, transaction.Verify())
+}
+
+func TestEncodeDecode(test *testing.T) {
+	transaction := randomTransactionWithSignature(test)
+	buff := &bytes.Buffer{}
+	assert.Nil(test, transaction.Encode(NewGobTxEncoder(buff)))
+
+	transactionDecoded := new(Transaction)
+	assert.Nil(test, transactionDecoded.Decode(NewGobTxDecoder(buff)))
+	assert.Equal(test, transaction, transactionDecoded)
 }
 
 func randomTransactionWithSignature(test *testing.T) *Transaction {
