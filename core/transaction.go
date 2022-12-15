@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/emmanueluwa/goblock/crypto"
+	"github.com/emmanueluwa/goblock/types"
 )
 
 type Transaction struct {
@@ -11,6 +12,22 @@ type Transaction struct {
 
 	From      crypto.PublicKey
 	Signature *crypto.Signature
+
+	//cashed version of transaction data hash
+	hash types.Hash
+}
+
+func NewTransaction(data []byte) *Transaction {
+	return &Transaction{
+		Data: data,
+	}
+}
+
+func (transaction *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
+	if transaction.hash.IsZero() {
+		transaction.hash = hasher.Hash(transaction)
+	}
+	return transaction.hash
 }
 
 // signing transaction

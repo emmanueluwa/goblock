@@ -18,3 +18,9 @@ func (BlockHasher) Hash(block *Header) types.Hash {
 	header := sha256.Sum256(block.Bytes())
 	return types.Hash(header)
 }
+
+type TxHasher struct{}
+
+func (TxHasher) Hash(transaction *Transaction) types.Hash {
+	return types.Hash(sha256.Sum256(transaction.Data))
+}
