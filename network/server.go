@@ -12,16 +12,16 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOptions struct {
-	RPCHandler RPCHandler
-	Transports []Transport
-	BlockTime  time.Duration
-	PrivateKey *crypto.PrivateKey
+	RPCDecodeFunc RPCDecodeFunc
+	RPCProcessor  RPCProcessor
+	Transports    []Transport
+	BlockTime     time.Duration
+	PrivateKey    *crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOptions
 	//for server to know when to create block from mempool values
-	blockTime   time.Duration
 	memPool     *TxPool
 	isValidator bool
 	rpcChannel  chan RPC
@@ -33,35 +33,41 @@ func NewServer(options ServerOptions) *Server {
 	if options.BlockTime == time.Duration(0) {
 		options.BlockTime = defaultBlockTime
 	}
+	if options.RPCDecodeFunc == nil {
+		options.RPCDecodeFunc = DefaultRPCDecodeFunc
+	}
+
 	server := &Server{
 		ServerOptions: options,
-		blockTime:     options.BlockTime,
 		memPool:       NewTxPool(),
 		isValidator:   options.PrivateKey != nil,
 		rpcChannel:    make(chan RPC),
 		quitChannel:   make(chan struct{}, 1),
 	}
 
-	if options.RPCHandler == nil {
-		options.RPCHandler = NewDefaultRPCHandler(server)
+	//if no rpc processer is given from options, the server is default processor
+	if server.RPCProcessor == nil {
+		server.RPCProcessor = server
 	}
-
-	server.ServerOptions = options
 
 	return server
 }
 
 func (server *Server) Start() {
 	server.initTransports()
-	ticker := time.NewTicker(server.blockTime)
+	ticker := time.NewTicker(server.BlockTime)
 
 free:
 	for {
 		//block until a case can run and is executed
 		select {
 		case rpc := <-server.rpcChannel:
-			if err := server.RPCHandler.HandleRPC(rpc); err != nil {
-				//log instead of panic as it is expected there will be errors, eg wrong bytes
+			message, err := server.RPCDecodeFunc(rpc)
+			if err != nil {
+				logrus.Error(err)
+			}
+
+			if err := server.RPCProcessor.ProcessMessage(message); err != nil {
 				logrus.Error(err)
 			}
 		case <-server.quitChannel:
@@ -76,7 +82,15 @@ free:
 	fmt.Println("Server shutdown")
 }
 
-func (server *Server) ProcessTransaction(from NetAddress, transaction *core.Transaction) error {
+func (server *Server) ProcessMessage(message *DecodedMessage) error {
+	switch t := message.Data.(type) {
+	case *core.Transaction:
+		return server.ProcessTransaction(t)
+	}
+	return nil
+}
+
+func (server *Server) ProcessTransaction(transaction *core.Transaction) error {
 	hash := transaction.Hash(core.TxHasher{})
 
 	if server.memPool.Has(hash) {

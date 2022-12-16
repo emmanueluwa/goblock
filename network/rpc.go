@@ -50,26 +50,17 @@ func (message *Message) Bytes() []byte {
 	return buffer.Bytes()
 }
 
-type RPCHandler interface {
-	//decoder
-	HandleRPC(rpc RPC) error
+type DecodedMessage struct {
+	From NetAddress
+	Data any
 }
 
-type DefaultRPCHandler struct {
-	processor RPCProcessor
-}
+type RPCDecodeFunc func(RPC) (*DecodedMessage, error)
 
-func NewDefaultRPCHandler(processor RPCProcessor) *DefaultRPCHandler {
-	return &DefaultRPCHandler{
-		processor: processor,
-	}
-}
-
-// our implementation, therefor no need to abstract way to decode it
-func (handler *DefaultRPCHandler) HandleRPC(rpc RPC) error {
+func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 	message := Message{}
 	if err := gob.NewDecoder(rpc.Payload).Decode(&message); err != nil {
-		return fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
+		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
 	}
 
 	//find out message type so we can handle it
@@ -77,16 +68,21 @@ func (handler *DefaultRPCHandler) HandleRPC(rpc RPC) error {
 	case MessageTypeTx:
 		transaction := new(core.Transaction)
 		if err := transaction.Decode(core.NewGobTxDecoder(bytes.NewReader(message.Data))); err != nil {
-			return err
+			return nil, err
 		}
-		return handler.processor.ProcessTransaction(rpc.From, transaction)
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: transaction,
+		}, nil
+
 	// dealing with messageType that we do not accept for example
 	default:
-		return fmt.Errorf("invalid message header %x", message.Header)
+		return nil, fmt.Errorf("invalid message header %x", message.Header)
 	}
 }
 
 // process encoded data from handler
 type RPCProcessor interface {
-	ProcessTransaction(NetAddress, *core.Transaction) error
+	ProcessMessage(*DecodedMessage) error
 }
