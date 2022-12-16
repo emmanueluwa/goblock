@@ -28,7 +28,12 @@ func TestSendMessage(test *testing.T) {
 
 	//consume channel, test real scenario of outside world having no access to consumer
 	rpc := <-localTransportB.Consume()
-	assert.Equal(test, rpc.Payload, message)
+	buffer := make([]byte, len(message))
+	n, err := rpc.Payload.Read(buffer)
+	assert.Nil(test, err)
+	assert.Equal(test, n, len(message))
+
+	assert.Equal(test, buffer, message)
 	//check address
 	assert.Equal(test, rpc.From, localTransportA.address)
 }

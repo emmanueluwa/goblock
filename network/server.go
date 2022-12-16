@@ -98,6 +98,8 @@ func (server *Server) ProcessTransaction(from NetAddress, transaction *core.Tran
 		"mempool length": server.memPool.Len(),
 	}).Info("adding new transaction to mempool")
 
+	//TODO (@emmanueluwa): broadcast this transaction to peers in network
+
 	return server.memPool.Add(transaction)
 }
 
