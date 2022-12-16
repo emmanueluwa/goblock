@@ -1,9 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"math/rand"
+	"strconv"
 	"time"
 
+	"github.com/emmanueluwa/goblock/core"
+	"github.com/emmanueluwa/goblock/crypto"
 	"github.com/emmanueluwa/goblock/network"
+	"github.com/sirupsen/logrus"
 )
 
 /***
@@ -29,7 +35,10 @@ func main() {
 
 	go func() {
 		for {
-			transportRemote.SendMessage(transportLocal.Address(), []byte("Obavan people"))
+			// transportRemote.SendMessage(transportLocal.Address(), []byte("Obavan people"))
+			if err := sendTransaction(transportRemote, transportLocal.Address()); err != nil {
+				logrus.Error(err)
+			}
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -41,4 +50,20 @@ func main() {
 
 	server := network.NewServer(options)
 	server.Start()
+}
+
+// placeholder for demonstration
+func sendTransaction(transport network.Transport, to network.NetAddress) error {
+	privKey := crypto.GeneratePrivateKey()
+	data := []byte(strconv.FormatInt(int64(rand.Intn(10000000)), 10))
+	transaction := core.NewTransaction(data)
+	transaction.Sign(privKey)
+	buffer := &bytes.Buffer{}
+	if err := transaction.Encode(core.NewGobTxEncoder(buffer)); err != nil {
+		return err
+	}
+
+	message := network.NewMessage(network.MessageTypeTx, buffer.Bytes())
+
+	return transport.SendMessage(to, message.Bytes())
 }

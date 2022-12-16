@@ -12,6 +12,7 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOptions struct {
+	RPCHandler RPCHandler
 	Transports []Transport
 	BlockTime  time.Duration
 	PrivateKey *crypto.PrivateKey
@@ -28,10 +29,11 @@ type Server struct {
 }
 
 func NewServer(options ServerOptions) *Server {
+
 	if options.BlockTime == time.Duration(0) {
 		options.BlockTime = defaultBlockTime
 	}
-	return &Server{
+	server := &Server{
 		ServerOptions: options,
 		blockTime:     options.BlockTime,
 		memPool:       NewTxPool(),
@@ -39,6 +41,14 @@ func NewServer(options ServerOptions) *Server {
 		rpcChannel:    make(chan RPC),
 		quitChannel:   make(chan struct{}, 1),
 	}
+
+	if options.RPCHandler == nil {
+		options.RPCHandler = NewDefaultRPCHandler(server)
+	}
+
+	server.ServerOptions = options
+
+	return server
 }
 
 func (server *Server) Start() {
@@ -50,7 +60,10 @@ free:
 		//block until a case can run and is executed
 		select {
 		case rpc := <-server.rpcChannel:
-			fmt.Printf("%+v\n", rpc)
+			if err := server.RPCHandler.HandleRPC(rpc); err != nil {
+				//log instead of panic as it is expected there will be errors, eg wrong bytes
+				logrus.Error(err)
+			}
 		case <-server.quitChannel:
 			break free
 		case <-ticker.C:
@@ -63,11 +76,7 @@ free:
 	fmt.Println("Server shutdown")
 }
 
-func (server *Server) handleTransaction(transaction *core.Transaction) error {
-	if err := transaction.Verify(); err != nil {
-		return err
-	}
-
+func (server *Server) ProcessTransaction(from NetAddress, transaction *core.Transaction) error {
 	hash := transaction.Hash(core.TxHasher{})
 
 	if server.memPool.Has(hash) {
@@ -78,8 +87,15 @@ func (server *Server) handleTransaction(transaction *core.Transaction) error {
 		return nil
 	}
 
+	if err := transaction.Verify(); err != nil {
+		return err
+	}
+
+	transaction.SetFirstSeen(time.Now().UnixNano())
+
 	logrus.WithFields(logrus.Fields{
-		"hash": transaction.Hash(core.TxHasher{}),
+		"hash":           transaction.Hash(core.TxHasher{}),
+		"mempool length": server.memPool.Len(),
 	}).Info("adding new transaction to mempool")
 
 	return server.memPool.Add(transaction)
