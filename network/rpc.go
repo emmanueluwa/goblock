@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/emmanueluwa/goblock/core"
+	"github.com/sirupsen/logrus"
 )
 
 /***
@@ -62,6 +63,11 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 	if err := gob.NewDecoder(rpc.Payload).Decode(&message); err != nil {
 		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"from": rpc.From,
+		"type": message.Header,
+	}).Debug("new incoming message")
 
 	//find out message type so we can handle it
 	switch message.Header {

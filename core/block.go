@@ -2,8 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
+	"time"
 
 	"github.com/emmanueluwa/goblock/crypto"
 	"github.com/emmanueluwa/goblock/types"
@@ -40,11 +42,28 @@ type Block struct {
 	hash types.Hash
 }
 
-func NewBlock(header *Header, transaction []Transaction) *Block {
+func NewBlock(header *Header, transactions []Transaction) (*Block, error) {
 	return &Block{
 		Header:       header,
-		Transactions: transaction,
+		Transactions: transactions,
+	}, nil
+}
+
+func NewBlockFromPrevHeader(prevHeader *Header, transactions []Transaction) (*Block, error) {
+	dataHash, err := CalculateDataHash(transactions)
+	if err != nil {
+		return nil, err
 	}
+
+	header := &Header{
+		Version:           1,
+		DataHash:          dataHash,
+		PreviousBlockHash: BlockHasher{}.Hash(prevHeader),
+		TimeStamp:         time.Now().UnixNano(),
+		Height:            prevHeader.Height + 1,
+	}
+
+	return NewBlock(header, transactions)
 }
 
 func (block *Block) AddTransaction(transaction *Transaction) {
@@ -81,6 +100,15 @@ func (block *Block) Verify() error {
 		}
 	}
 
+	//verifying datahash
+	dataHash, err := CalculateDataHash(block.Transactions)
+	if err != nil {
+		return err
+	}
+	if dataHash != block.DataHash {
+		return fmt.Errorf("block (%s) has an invalid data hash", block.Hash(BlockHasher{}))
+	}
+
 	return nil
 }
 
@@ -97,4 +125,18 @@ func (block *Block) Hash(hasher Hasher[*Header]) types.Hash {
 		block.hash = hasher.Hash(block.Header)
 	}
 	return block.hash
+}
+
+func CalculateDataHash(transactions []Transaction) (hash types.Hash, err error) {
+	buffer := &bytes.Buffer{}
+
+	for _, transaction := range transactions {
+		if err := transaction.Encode(NewGobTxEncoder(buffer)); err != nil {
+			return types.Hash{}, err
+		}
+	}
+
+	hash = sha256.Sum256(buffer.Bytes())
+
+	return
 }
