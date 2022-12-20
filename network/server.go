@@ -46,7 +46,7 @@ func NewServer(options ServerOptions) (*Server, error) {
 		options.Logger = log.With(options.Logger, "ID", options.ID)
 	}
 
-	chain, err := core.NewBlockchain(genesisBlock())
+	chain, err := core.NewBlockchain(options.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +110,8 @@ func (server *Server) ProcessMessage(message *DecodedMessage) error {
 	switch t := message.Data.(type) {
 	case *core.Transaction:
 		return server.ProcessTransaction(t)
+	case *core.Block:
+		return server.ProcessBlock()
 	}
 	return nil
 }
@@ -120,6 +122,16 @@ func (server *Server) broadcast(payload []byte) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (server *Server) ProcessBlock(block *core.Block) error {
+	if err := server.chain.AddBlock(block); err != nil {
+		return err
+	}
+
+	go server.broadcastBlock(block)
+
 	return nil
 }
 
@@ -134,17 +146,28 @@ func (server *Server) ProcessTransaction(transaction *core.Transaction) error {
 		return err
 	}
 
-	transaction.SetFirstSeen(time.Now().UnixNano())
-
 	server.Logger.Log(
 		"message", "adding new transaction to mempool",
-		"hash", hash, "mempoolLength",
-		server.memPool.Len(),
+		"hash", hash,
+		"mempoolLength", server.memPool.Len(),
 	)
 
 	go server.broadcastTransaction(transaction)
 
-	return server.memPool.Add(transaction)
+	server.memPool.Add(transaction)
+
+	return nil
+}
+
+func (server *Server) broadcastBlock(block *core.Block) error {
+	buffer := &bytes.Buffer{}
+	if err := block.Encode(core.NewGobBlockEncoder(buffer)); err != nil {
+		return err
+	}
+
+	message := NewMessage(MessageTypeBlock, buffer.Bytes())
+
+	return server.broadcast(message.Bytes())
 }
 
 // encoding broadcast for transport
@@ -179,7 +202,12 @@ func (server *Server) createNewBlock() error {
 		return err
 	}
 
-	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	//using all transactions in mempool for now till internal structure of transaction
+	// is known, complexity function will be implemented to determine no. of transactions
+	// to include in each block
+	transactions := server.memPool.Pending()
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, transactions)
 	if err != nil {
 		return err
 	}
@@ -192,6 +220,10 @@ func (server *Server) createNewBlock() error {
 		return err
 	}
 
+	server.memPool.ClearPending()
+
+	go server.broadcastBlock(block)
+
 	return nil
 }
 
@@ -200,7 +232,7 @@ func genesisBlock() *core.Block {
 		Version:   1,
 		DataHash:  types.Hash{},
 		Height:    0,
-		TimeStamp: time.Now().UnixNano(),
+		TimeStamp: 000000,
 	}
 
 	block, _ := core.NewBlock(header, nil)

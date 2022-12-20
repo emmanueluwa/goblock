@@ -19,9 +19,9 @@ Recieved plain byte payload needs to be converted into
 type MessageType byte
 
 const (
-	MessageTypeTx MessageType = 0x1
 	//automatically increments since it is below the above, similar to enum
-	MessageTypeBlock
+	MessageTypeTx    MessageType = 0x1
+	MessageTypeBlock MessageType = 0x2
 )
 
 //*
@@ -80,6 +80,17 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 		return &DecodedMessage{
 			From: rpc.From,
 			Data: transaction,
+		}, nil
+
+	case MessageTypeBlock:
+		block := new(core.Block)
+		if err := block.Decode(core.NewGobBlockDecoder(bytes.NewReader(message.Data))); err != nil {
+			return nil, err
+		}
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: block,
 		}, nil
 
 	// dealing with messageType that we do not accept for example

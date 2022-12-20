@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
@@ -29,34 +30,62 @@ SERVER(CONTAINER)
 
 func main() {
 	transportLocal := network.NewLocalTransport("LOCAL")
-	transportRemote := network.NewLocalTransport(("REMOTE"))
+	transportRemoteA := network.NewLocalTransport(("REMOTE_A"))
+	transportRemoteB := network.NewLocalTransport(("REMOTE_B"))
+	transportRemoteC := network.NewLocalTransport(("REMOT_C"))
 
-	transportLocal.Connect(transportRemote)
-	transportRemote.Connect(transportLocal)
+	transportLocal.Connect(transportRemoteA)
+	transportRemoteA.Connect(transportRemoteB)
+	transportRemoteB.Connect(transportRemoteC)
+	transportRemoteA.Connect(transportLocal)
+
+	initRemoteServers([]network.Transport{transportRemoteA, transportRemoteB, transportRemoteC})
 
 	go func() {
 		for {
 			// transportRemote.SendMessage(transportLocal.Address(), []byte("Obavan people"))
-			if err := sendTransaction(transportRemote, transportLocal.Address()); err != nil {
+			if err := sendTransaction(transportRemoteA, transportLocal.Address()); err != nil {
 				logrus.Error(err)
 			}
 			time.Sleep(1 * time.Second)
 		}
 	}()
 
+	go func() {
+		time.Sleep(7 * time.Second)
+		transportLate := network.NewLocalTransport("LATE_REMOTE")
+		transportRemoteC.Connect(transportLate)
+		lateServer := makeServer(string(transportLate.Address()), transportLate, nil)
+
+		go lateServer.Start()
+	}()
+
+	//local server
 	privKey := crypto.GeneratePrivateKey()
-	//configure our own server/node
+	localServer := makeServer("LOCAL", transportLocal, &privKey)
+	localServer.Start()
+}
+
+func initRemoteServers(transports []network.Transport) {
+	for i := 0; i < len(transports); i++ {
+		id := fmt.Sprintf("REMOTE_%d", i)
+		server := makeServer(id, transports[i], nil)
+		go server.Start()
+	}
+}
+
+func makeServer(id string, transport network.Transport, pk *crypto.PrivateKey) *network.Server {
 	options := network.ServerOptions{
-		PrivateKey: &privKey,
-		ID:         "LOCAL",
-		Transports: []network.Transport{transportLocal},
+		PrivateKey: pk,
+		ID:         id,
+		Transports: []network.Transport{transport},
 	}
 
 	server, err := network.NewServer(options)
 	if err != nil {
-		return log.Fatal(err)
+		log.Fatal(err)
 	}
-	server.Start()
+	return server
 }
 
 // placeholder for demonstration

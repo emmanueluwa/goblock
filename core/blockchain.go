@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
+	"github.com/go-kit/log"
 )
 
 type Blockchain struct {
+	logger log.Logger
 	//for json rpc(recieving block) and protocol, other nodes can ask blocks to sync
 	store Storage
 	//for distirbuted env, blockchain data structure needs to be threadsafe
@@ -17,10 +18,11 @@ type Blockchain struct {
 	validator Validator
 }
 
-func NewBlockchain(genesis *Block) (*Blockchain, error) {
+func NewBlockchain(log log.Logger, genesis *Block) (*Blockchain, error) {
 	blockchain := &Blockchain{
 		headers: []*Header{},
 		store:   NewMemoryStore(),
+		logger:  log,
 	}
 	blockchain.validator = NewBlockValidator(blockchain)
 	err := blockchain.addBlockWithoutValidation(genesis)
@@ -71,10 +73,12 @@ func (blockchain *Blockchain) addBlockWithoutValidation(block *Block) error {
 	blockchain.headers = append(blockchain.headers, block.Header)
 	blockchain.lock.Unlock()
 
-	logrus.WithFields(logrus.Fields{
-		"height": block.Height,
-		"hash":   block.Hash(BlockHasher{}),
-	}).Info("adding new block")
+	blockchain.logger.Log(
+		"message", "new block",
+		"hash", block.Hash(BlockHasher{}),
+		"height", block.Height,
+		"transactions", len(block.Transactions),
+	)
 
 	return blockchain.store.Put(block)
 }

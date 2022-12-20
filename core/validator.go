@@ -29,7 +29,7 @@ func (validator *BlockValidator) ValidateBlock(block *Block) error {
 
 	//ensuring block comes exactly after current height(no blocks skipped)
 	if block.Height != validator.blockchain.Height()+1 {
-		return fmt.Errorf("Block (%s) too hight", block.Hash(BlockHasher{}))
+		return fmt.Errorf("Block (%s) with height (%d) is too high => curent height (%d)", block.Hash(BlockHasher{}), block.Height, validator.blockchain.Height())
 	}
 
 	//checking hash of previous block

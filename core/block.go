@@ -32,7 +32,7 @@ func (header *Header) Bytes() []byte {
 
 type Block struct {
 	*Header
-	Transactions []Transaction
+	Transactions []*Transaction
 
 	//validator to enable a block to propose blocks into the network
 	Validator crypto.PublicKey
@@ -42,14 +42,14 @@ type Block struct {
 	hash types.Hash
 }
 
-func NewBlock(header *Header, transactions []Transaction) (*Block, error) {
+func NewBlock(header *Header, transactions []*Transaction) (*Block, error) {
 	return &Block{
 		Header:       header,
 		Transactions: transactions,
 	}, nil
 }
 
-func NewBlockFromPrevHeader(prevHeader *Header, transactions []Transaction) (*Block, error) {
+func NewBlockFromPrevHeader(prevHeader *Header, transactions []*Transaction) (*Block, error) {
 	dataHash, err := CalculateDataHash(transactions)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func NewBlockFromPrevHeader(prevHeader *Header, transactions []Transaction) (*Bl
 }
 
 func (block *Block) AddTransaction(transaction *Transaction) {
-	block.Transactions = append(block.Transactions, *transaction)
+	block.Transactions = append(block.Transactions, transaction)
 }
 
 // signature is embedded in block
@@ -127,7 +127,7 @@ func (block *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	return block.hash
 }
 
-func CalculateDataHash(transactions []Transaction) (hash types.Hash, err error) {
+func CalculateDataHash(transactions []*Transaction) (hash types.Hash, err error) {
 	buffer := &bytes.Buffer{}
 
 	for _, transaction := range transactions {

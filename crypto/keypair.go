@@ -11,11 +11,11 @@ import (
 )
 
 type PrivateKey struct {
-	privKey *ecdsa.PrivateKey
+	Key *ecdsa.PrivateKey
 }
 
-func (privKey PrivateKey) Sign(data []byte) (*Signature, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, privKey.privKey, data)
+func (k PrivateKey) Sign(data []byte) (*Signature, error) {
+	r, s, err := ecdsa.Sign(rand.Reader, k.Key, data)
 	if err != nil {
 		return nil, err
 	}
@@ -27,30 +27,30 @@ func (privKey PrivateKey) Sign(data []byte) (*Signature, error) {
 }
 
 func GeneratePrivateKey() PrivateKey {
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	//cannot continue if this fails so we panic
 	if err != nil {
 		panic(err)
 	}
 
 	return PrivateKey{
-		privKey: privKey,
+		Key: key,
 	}
 }
 
-func (privKey PrivateKey) PublicKey() PublicKey {
+func (k PrivateKey) PublicKey() PublicKey {
 	return PublicKey{
-		PubKey: &privKey.privKey.PublicKey,
+		Key: &k.Key.PublicKey,
 	}
 }
 
 type PublicKey struct {
-	PubKey *ecdsa.PublicKey
+	Key *ecdsa.PublicKey
 }
 
 // access bytes from public key (curve, (x,y)BigInt)
-func (pubKey PublicKey) ToSlice() []byte {
-	return elliptic.MarshalCompressed(pubKey.PubKey, pubKey.PubKey.X, pubKey.PubKey.Y)
+func (k PublicKey) ToSlice() []byte {
+	return elliptic.MarshalCompressed(k.Key, k.Key.X, k.Key.Y)
 }
 
 // create address using public key
@@ -66,5 +66,5 @@ type Signature struct {
 
 // verify that signature matches public key (valid)
 func (signature Signature) Verify(pubKey PublicKey, data []byte) bool {
-	return ecdsa.Verify(pubKey.PubKey, data, signature.R, signature.S)
+	return ecdsa.Verify(pubKey.Key, data, signature.R, signature.S)
 }

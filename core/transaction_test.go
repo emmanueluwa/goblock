@@ -42,15 +42,15 @@ func TestEncodeDecode(test *testing.T) {
 
 	transactionDecoded := new(Transaction)
 	assert.Nil(test, transactionDecoded.Decode(NewGobTxDecoder(buff)))
-	assert.Equal(test, &transaction, transactionDecoded)
+	assert.Equal(test, transaction, transactionDecoded)
 }
 
-func randomTransactionWithSignature(test *testing.T) Transaction {
+func randomTransactionWithSignature(test *testing.T) *Transaction {
 	privKey := crypto.GeneratePrivateKey()
 	transaction := Transaction{
 		Data: []byte("meow"),
 	}
 	assert.Nil(test, transaction.Sign(privKey))
 
-	return transaction
+	return &transaction
 }
