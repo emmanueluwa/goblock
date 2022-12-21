@@ -26,7 +26,7 @@ type ServerOptions struct {
 type Server struct {
 	ServerOptions
 	//for server to know when to create block from mempool values
-	memPool     *TxPool
+	memPool     *TransactionPool
 	chain       *core.Blockchain
 	isValidator bool
 	rpcChannel  chan RPC
@@ -53,7 +53,7 @@ func NewServer(options ServerOptions) (*Server, error) {
 	server := &Server{
 		ServerOptions: options,
 		chain:         chain,
-		memPool:       NewTxPool(),
+		memPool:       NewTransactionPool(1000),
 		isValidator:   options.PrivateKey != nil,
 		rpcChannel:    make(chan RPC),
 		quitChannel:   make(chan struct{}, 1),
@@ -111,7 +111,7 @@ func (server *Server) ProcessMessage(message *DecodedMessage) error {
 	case *core.Transaction:
 		return server.ProcessTransaction(t)
 	case *core.Block:
-		return server.ProcessBlock()
+		return server.ProcessBlock(t)
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func (server *Server) ProcessBlock(block *core.Block) error {
 func (server *Server) ProcessTransaction(transaction *core.Transaction) error {
 	hash := transaction.Hash(core.TxHasher{})
 
-	if server.memPool.Has(hash) {
+	if server.memPool.Contains(hash) {
 		return nil
 	}
 
@@ -149,7 +149,7 @@ func (server *Server) ProcessTransaction(transaction *core.Transaction) error {
 	server.Logger.Log(
 		"message", "adding new transaction to mempool",
 		"hash", hash,
-		"mempoolLength", server.memPool.Len(),
+		"mempoolLength", server.memPool.PendingCount(),
 	)
 
 	go server.broadcastTransaction(transaction)
@@ -237,5 +237,4 @@ func genesisBlock() *core.Block {
 
 	block, _ := core.NewBlock(header, nil)
 	return block
-
 }

@@ -20,8 +20,9 @@ type MessageType byte
 
 const (
 	//automatically increments since it is below the above, similar to enum
-	MessageTypeTx    MessageType = 0x1
-	MessageTypeBlock MessageType = 0x2
+	MessageTypeTx        MessageType = 0x1
+	MessageTypeBlock     MessageType = 0x2
+	MessageTypeGetBlocks MessageType = 0x3
 )
 
 //*

@@ -39,6 +39,17 @@ func (blockchain *Blockchain) AddBlock(block *Block) error {
 		return err
 	}
 
+	for _, transaction := range block.Transactions {
+		blockchain.logger.Log("message", "executing code", "len", len(transaction.Data), "hash", transaction.Hash(&TxHasher{}))
+
+		vm := NewVM(transaction.Data)
+		if err := vm.Run(); err != nil {
+			return err
+		}
+
+		blockchain.Log("vm result", vm.stack[vm.sp])
+	}
+
 	//validation already done if no error
 	return blockchain.addBlockWithoutValidation(block)
 }

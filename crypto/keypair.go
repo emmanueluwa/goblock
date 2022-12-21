@@ -5,17 +5,19 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"math/big"
 
 	"github.com/emmanueluwa/goblock/types"
 )
 
 type PrivateKey struct {
-	Key *ecdsa.PrivateKey
+	key *ecdsa.PrivateKey
 }
 
 func (k PrivateKey) Sign(data []byte) (*Signature, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, k.Key, data)
+	r, s, err := ecdsa.Sign(rand.Reader, k.key, data)
 	if err != nil {
 		return nil, err
 	}
@@ -26,45 +28,56 @@ func (k PrivateKey) Sign(data []byte) (*Signature, error) {
 	}, nil
 }
 
-func GeneratePrivateKey() PrivateKey {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+func NewPrivateKeyFromReader(reader io.Reader) PrivateKey {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), reader)
 	//cannot continue if this fails so we panic
 	if err != nil {
 		panic(err)
 	}
 
 	return PrivateKey{
-		Key: key,
+		key: key,
 	}
+}
+
+func GeneratePrivateKey() PrivateKey {
+	return NewPrivateKeyFromReader(rand.Reader)
 }
 
 func (k PrivateKey) PublicKey() PublicKey {
-	return PublicKey{
-		Key: &k.Key.PublicKey,
-	}
+	return elliptic.MarshalCompressed(k.key.PublicKey, k.key.PublicKey.X, k.key.PublicKey.Y)
 }
 
-type PublicKey struct {
-	Key *ecdsa.PublicKey
+type PublicKey []byte
+
+func (k PublicKey) String() string {
+	return hex.EncodeToString(k)
 }
 
-// access bytes from public key (curve, (x,y)BigInt)
-func (k PublicKey) ToSlice() []byte {
-	return elliptic.MarshalCompressed(k.Key, k.Key.X, k.Key.Y)
-}
+func (k PublicKey) Address() types.Address {
+	hash := sha256.Sum256(k)
 
-// create address using public key
-func (pubKey PublicKey) Address() types.Address {
-	hash := sha256.Sum256(pubKey.ToSlice())
-	//using the last 20 bytes
 	return types.AddressFromBytes(hash[len(hash)-20:])
 }
 
 type Signature struct {
-	R, S *big.Int
+	S *big.Int
+	R *big.Int
+}
+
+func (signature Signature) String() string {
+	b := append(signature.S.Bytes(), signature.R.Bytes()...)
+	return hex.EncodeToString(b)
 }
 
 // verify that signature matches public key (valid)
 func (signature Signature) Verify(pubKey PublicKey, data []byte) bool {
-	return ecdsa.Verify(pubKey.Key, data, signature.R, signature.S)
+	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubKey)
+	key := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	return ecdsa.Verify(key, data, signature.R, signature.S)
 }
