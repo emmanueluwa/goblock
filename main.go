@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"math/rand"
-	"strconv"
 	"time"
 
 	"github.com/emmanueluwa/goblock/core"
@@ -91,7 +89,7 @@ func makeServer(id string, transport network.Transport, pk *crypto.PrivateKey) *
 // placeholder for demonstration
 func sendTransaction(transport network.Transport, to network.NetAddress) error {
 	privKey := crypto.GeneratePrivateKey()
-	data := []byte(strconv.FormatInt(int64(rand.Intn(10000000)), 10))
+	data := []byte{0x01, 0x0a, 0x02, 0x0a, 0x0b}
 	transaction := core.NewTransaction(data)
 	transaction.Sign(privKey)
 	buffer := &bytes.Buffer{}

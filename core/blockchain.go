@@ -47,7 +47,7 @@ func (blockchain *Blockchain) AddBlock(block *Block) error {
 			return err
 		}
 
-		blockchain.Log("vm result", vm.stack[vm.sp])
+		blockchain.Log("vm result", vm.stack.data[vm.stack.sp])
 	}
 
 	//validation already done if no error
