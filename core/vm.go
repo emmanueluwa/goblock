@@ -14,6 +14,8 @@ const (
 	InstructionSub      Instruction = 0x0e
 	InstructionStore    Instruction = 0x0f
 	InstructionGet      Instruction = 0xae
+	InstructionMul      Instruction = 0xea
+	InstructionDiv      Instruction = 0xfd
 )
 
 type Stack struct {
@@ -133,6 +135,18 @@ func (vm *VM) Exec(instruction Instruction) error {
 		a := vm.stack.Pop().(int)
 		b := vm.stack.Pop().(int)
 		c := a + b
+		vm.stack.Push(c)
+
+	case InstructionMul:
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
+		c := a * b
+		vm.stack.Push(c)
+
+	case InstructionDiv:
+		a := vm.stack.Pop().(int)
+		b := vm.stack.Pop().(int)
+		c := a / b
 		vm.stack.Push(c)
 	}
 

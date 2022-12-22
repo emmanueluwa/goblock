@@ -84,3 +84,23 @@ func TestVMGet(test *testing.T) {
 	// val := deserializeInt64(valBytes)
 	// assert.Equal(test, val, int64(5))
 }
+
+func TestVMMul(test *testing.T) {
+	data := []byte{0x02, 0x0a, 0x02, 0x0a, 0xea}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(test, vm.Run())
+
+	result := vm.stack.Pop().(int)
+	assert.Equal(test, result, 4)
+}
+
+func TestVMDiv(test *testing.T) {
+	data := []byte{0x04, 0x0a, 0x02, 0x0a, 0xfd}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(test, vm.Run())
+
+	result := vm.stack.Pop().(int)
+	assert.Equal(test, result, 2)
+}

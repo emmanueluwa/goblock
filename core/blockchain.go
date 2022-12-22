@@ -51,6 +51,9 @@ func (blockchain *Blockchain) AddBlock(block *Block) error {
 		}
 
 		fmt.Printf("STATE: %+v\n", vm.contractState)
+
+		result := vm.stack.Pop()
+		fmt.Printf("VM Result: %+v\n", result)
 	}
 
 	//validation already done if no error
