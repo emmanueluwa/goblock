@@ -89,10 +89,9 @@ func makeServer(id string, transport network.Transport, pk *crypto.PrivateKey) *
 // placeholder for demonstration
 func sendTransaction(transport network.Transport, to network.NetAddress) error {
 	privKey := crypto.GeneratePrivateKey()
-	// data := []byte{0x01, 0x0a, 0x02, 0x0a, 0x0b}
-	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f} //, 0x03, 0x0a, 0x02, 0x0a, 0x0e}
+	contract := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x03, 0x0a, 0x0d, 0x0f}
 
-	transaction := core.NewTransaction(data)
+	transaction := core.NewTransaction(contract)
 	transaction.Sign(privKey)
 	buffer := &bytes.Buffer{}
 	if err := transaction.Encode(core.NewGobTxEncoder(buffer)); err != nil {

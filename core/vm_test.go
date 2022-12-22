@@ -34,7 +34,13 @@ func TestVM(test *testing.T) {
 	//subtract
 	// data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
 
-	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f} //, 0x03, 0x0a, 0x02, 0x0a, 0x0e}
+	// push FOO to stack, pack, push 5 to stack, store
+	// data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f}
+	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x03, 0x0a, 0x0d, 0x0f}
+	dataOther := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4d, 0x0c, 0x4f, 0x0c, 0x46, 0x03, 0x0a, 0x0d, 0x0f}
+
+	data = append(data, dataOther...)
+
 	contractState := NewState()
 	vm := NewVM(data, contractState)
 	assert.Nil(test, vm.Run())
@@ -49,10 +55,32 @@ func TestVM(test *testing.T) {
 	// result := vm.stack.Pop().([]byte)
 	// fmt.Printf("%+v\n", vm.stack.data)
 
-	valBytes, err := contractState.Get([]byte("FOO"))
-	val := deserializeInt64(valBytes)
-	assert.Nil(test, err)
-	assert.Equal(test, val, int64(5))
+	fmt.Printf("%+v\n", contractState)
 
-	// assert.Equal(test, 1, result)
+	valBytes, err := contractState.Get([]byte("FOO"))
+	assert.Nil(test, err)
+	val := deserializeInt64(valBytes)
+	assert.Equal(test, val, int64(5))
+}
+
+func TestVMGet(test *testing.T) {
+	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0x0f}
+	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x03, 0x0a, 0x0d, 0xae}
+
+	data = append(data, pushFoo...)
+
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(test, vm.Run())
+
+	fmt.Printf("%+v", vm.stack.data)
+	val := vm.stack.Pop().([]byte)
+	valSerialized := deserializeInt64(val)
+
+	assert.Equal(test, valSerialized, int64(5))
+
+	// valBytes, err := contractState.Get([]byte("FOO"))
+	// assert.Nil(test, err)
+	// val := deserializeInt64(valBytes)
+	// assert.Equal(test, val, int64(5))
 }
