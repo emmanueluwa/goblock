@@ -16,13 +16,16 @@ type Blockchain struct {
 	//maintain in memory, RAM intensive instead of Disk intensive
 	headers   []*Header
 	validator Validator
+	// TODO: MAKE THIS AN INTERFACE
+	contractState *State
 }
 
 func NewBlockchain(log log.Logger, genesis *Block) (*Blockchain, error) {
 	blockchain := &Blockchain{
-		headers: []*Header{},
-		store:   NewMemoryStore(),
-		logger:  log,
+		contractState: NewState(),
+		headers:       []*Header{},
+		store:         NewMemoryStore(),
+		logger:        log,
 	}
 	blockchain.validator = NewBlockValidator(blockchain)
 	err := blockchain.addBlockWithoutValidation(genesis)
@@ -42,12 +45,12 @@ func (blockchain *Blockchain) AddBlock(block *Block) error {
 	for _, transaction := range block.Transactions {
 		blockchain.logger.Log("message", "executing code", "len", len(transaction.Data), "hash", transaction.Hash(&TxHasher{}))
 
-		vm := NewVM(transaction.Data)
+		vm := NewVM(transaction.Data, blockchain.contractState)
 		if err := vm.Run(); err != nil {
 			return err
 		}
 
-		blockchain.Log("vm result", vm.stack.data[vm.stack.sp])
+		fmt.Printf("STATE: %+v\n", vm.contractState)
 	}
 
 	//validation already done if no error

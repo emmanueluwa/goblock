@@ -28,12 +28,15 @@ func TestVM(test *testing.T) {
 
 	// string
 	//0x61 = a
+	//FOO
 	// data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d}
 
 	//subtract
-	data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
+	// data := []byte{0x03, 0x0a, 0x02, 0x0a, 0x0e}
 
-	vm := NewVM(data)
+	data := []byte{0x03, 0x0a, 0x46, 0x0c, 0x4f, 0x0c, 0x4f, 0x0c, 0x0d, 0x05, 0x0a, 0x0f} //, 0x03, 0x0a, 0x02, 0x0a, 0x0e}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
 	assert.Nil(test, vm.Run())
 
 	// 1 + 2 = 3
@@ -43,6 +46,13 @@ func TestVM(test *testing.T) {
 	// result := vm.stack.Pop().([]byte)
 	// assert.Equal(test, "FOO", string(result))
 
-	result := vm.stack.Pop().(int)
-	assert.Equal(test, 1, result)
+	// result := vm.stack.Pop().([]byte)
+	// fmt.Printf("%+v\n", vm.stack.data)
+
+	valBytes, err := contractState.Get([]byte("FOO"))
+	val := deserializeInt64(valBytes)
+	assert.Nil(test, err)
+	assert.Equal(test, val, int64(5))
+
+	// assert.Equal(test, 1, result)
 }
