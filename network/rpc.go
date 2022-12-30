@@ -23,6 +23,8 @@ const (
 	MessageTypeTx        MessageType = 0x1
 	MessageTypeBlock     MessageType = 0x2
 	MessageTypeGetBlocks MessageType = 0x3
+	MessageTypeStatus    MessageType = 0x4
+	MessageTypeGetStatus MessageType = 0x5
 )
 
 //*
@@ -92,6 +94,23 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 		return &DecodedMessage{
 			From: rpc.From,
 			Data: block,
+		}, nil
+
+	case MessageTypeGetStatus:
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: &GetStatusMessage{},
+		}, nil
+
+	case MessageTypeStatus:
+		statusMessage := new(StatusMessage)
+		if err := gob.NewDecoder(bytes.NewReader(message.Data)).Decode(statusMessage); err != nil {
+			return nil, err
+		}
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: statusMessage,
 		}, nil
 
 	// dealing with messageType that we do not accept for example

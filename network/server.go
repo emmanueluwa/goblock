@@ -3,6 +3,8 @@ package network
 import (
 	"bytes"
 	"crypto"
+	"encoding/gob"
+	"fmt"
 	"os"
 	"time"
 
@@ -15,6 +17,7 @@ var defaultBlockTime = 5 * time.Second
 
 type ServerOptions struct {
 	ID            string
+	Transport     Transport
 	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
@@ -43,7 +46,7 @@ func NewServer(options ServerOptions) (*Server, error) {
 	}
 	if options.Logger == nil {
 		options.Logger = log.NewLogfmtLogger(os.Stderr)
-		options.Logger = log.With(options.Logger, "ID", options.ID)
+		options.Logger = log.With(options.Logger, "address", options.Transport.Address())
 	}
 
 	chain, err := core.NewBlockchain(options.Logger, genesisBlock())
@@ -68,6 +71,8 @@ func NewServer(options ServerOptions) (*Server, error) {
 		go server.validatorLoop()
 	}
 
+	server.bootstrapNodes()
+
 	return server, nil
 }
 
@@ -85,13 +90,33 @@ free:
 			}
 
 			if err := server.RPCProcessor.ProcessMessage(message); err != nil {
-				server.Logger.Log("error", err)
+				if err == core.ErrBlockKnown {
+					server.Logger.Log("error", err)
+				}
 			}
 		case <-server.quitChannel:
 			break free
 		}
 	}
 	server.Logger.Log("message", "Server is shutting down")
+}
+
+func (server *Server) bootstrapNodes() {
+	for _, transport := range server.Transports {
+		if server.Transport.Address() != transport.Address() {
+			if err := server.Transport.Connect(transport); err != nil {
+				server.Logger.Log("error", "could not connect to remote", "err", err)
+			}
+			server.Logger.Log("message", "connect to remote", "our address", server.Transport.Address(), "address", transport.Address())
+
+			//send getStatusMessage for sync if needed
+			fmt.Printf("%s sending message to => %+s\n", server.Transport.Address(), transport.Address())
+
+			if err := server.sendGetStatusMessage(transport); err != nil {
+				server.Logger.Log("error", "sendGetStatusMessage", "err", err)
+			}
+		}
+	}
 }
 
 func (server *Server) validatorLoop() {
@@ -106,13 +131,46 @@ func (server *Server) validatorLoop() {
 }
 
 func (server *Server) ProcessMessage(message *DecodedMessage) error {
-
+	fmt.Printf("recieving message: %+v\n", message.Data)
 	switch t := message.Data.(type) {
 	case *core.Transaction:
-		return server.ProcessTransaction(t)
+		return server.processTransaction(t)
 	case *core.Block:
-		return server.ProcessBlock(t)
+		return server.processBlock(t)
+	case *GetStatusMessage:
+		return server.processGetStatusMessage(message.From, t)
+	case *StatusMessage:
+		return server.processStatusMessage(message.From, t)
+	case *GetBlocksMessage:
+		return server.processGetBlocksMessage(message.From, t)
 	}
+
+	return nil
+}
+
+func (server *Server) processGetBlocksMessage(from NetAddress, data *GetBlocksMessage) error {
+	fmt.Printf("recieved get blocks message %+v", data)
+
+	return nil
+}
+
+// TODO(@emmanueluwa): REMOVE LOGIC FROM MAIN FUNCTION TO HERE
+// TRANSPORT THAT IS OUR OWN SHOUDL SUFFICE
+func (server *Server) sendGetStatusMessage(transport Transport) error {
+	var (
+		getStatusMessage = new(GetStatusMessage)
+		buffer           = new(bytes.Buffer)
+	)
+
+	if err := gob.NewEncoder(buffer).Encode(getStatusMessage); err != nil {
+		return err
+	}
+
+	message := NewMessage(MessageTypeGetStatus, buffer.Bytes())
+	if err := server.Transport.SendMessage(transport.Address(), message.Bytes()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -125,7 +183,48 @@ func (server *Server) broadcast(payload []byte) error {
 	return nil
 }
 
-func (server *Server) ProcessBlock(block *core.Block) error {
+func (server *Server) processStatusMessage(from NetAddress, data *StatusMessage) error {
+	//only ask for blocks if block height(of node we recieve statusMessage from) is higher
+	if data.CurrentHeight <= server.chain.Height() {
+		server.Logger.Log("message", "cannot sync blockHeight too low", "ourHeight", server.chain.Height(), "address", from)
+		return nil
+	}
+
+	//for case of node having blocks higher than us
+	getBlocksMessage := &GetBlocksMessage{
+		From: server.chain.Height(),
+		To:   0,
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := gob.NewEncoder(buffer).Encode(getBlocksMessage); err != nil {
+		return err
+	}
+
+	message := NewMessage(MessageTypeGetBlocks, buffer.Bytes())
+
+	return server.Transport.SendMessage(from, message.Bytes())
+}
+
+func (server *Server) processGetStatusMessage(from NetAddress, data *GetStatusMessage) error {
+	fmt.Printf("received GETstatus message from %s => %+v\n", from, data)
+
+	statusMessage := &StatusMessage{
+		CurrentHeight: server.chain.Height(),
+		ID:            server.ID,
+	}
+
+	buffer := new(bytes.Buffer)
+	if err := gob.NewEncoder(buffer).Encode(statusMessage); err != nil {
+		return err
+	}
+
+	message := NewMessage(MessageTypeStatus, buffer.Bytes())
+
+	return server.Transport.SendMessage(from, message.Bytes())
+}
+
+func (server *Server) processBlock(block *core.Block) error {
 	if err := server.chain.AddBlock(block); err != nil {
 		return err
 	}
@@ -135,7 +234,7 @@ func (server *Server) ProcessBlock(block *core.Block) error {
 	return nil
 }
 
-func (server *Server) ProcessTransaction(transaction *core.Transaction) error {
+func (server *Server) processTransaction(transaction *core.Transaction) error {
 	hash := transaction.Hash(core.TxHasher{})
 
 	if server.memPool.Contains(hash) {

@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 /***
 Reason for interface:
@@ -8,6 +11,9 @@ Reason for interface:
 - use it to make other stuff
 - can be used as default or another can be made by others
 ***/
+
+var ErrBlockKnown = errors.New("block already known")
+
 type Validator interface {
 	ValidateBlock(*Block) error
 }
@@ -24,7 +30,8 @@ func NewBlockValidator(blockchain *Blockchain) *BlockValidator {
 
 func (validator *BlockValidator) ValidateBlock(block *Block) error {
 	if validator.blockchain.HasBlock(block.Height) {
-		return fmt.Errorf("chain already contains block (%d) with hash (%s)", block.Height, block.Hash(BlockHasher{}))
+		// return fmt.Errorf("chain already contains block (%d) with hash (%s)", block.Height, block.Hash(BlockHasher{}))
+		return ErrBlockKnown
 	}
 
 	//ensuring block comes exactly after current height(no blocks skipped)

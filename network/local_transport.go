@@ -41,9 +41,13 @@ func (localTransport *LocalTransport) SendMessage(to NetAddress, payload []byte)
 	localTransport.lock.RLock()
 	defer localTransport.lock.RUnlock()
 
+	if localTransport.address == to {
+		return nil
+	}
+
 	peer, ok := localTransport.peers[to]
 	if !ok {
-		return fmt.Errorf("%s coul not send message to unknown peers %s", localTransport.address, to)
+		return fmt.Errorf("%s could not send message to unknown peers %s", localTransport.address, to)
 	}
 
 	peer.consumeChannel <- RPC{
